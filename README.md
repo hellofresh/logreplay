@@ -2,7 +2,7 @@ logreplay
 ===========
 
 The overall goal is to re-feed logs stored on S3 into an ElasticSearch (ES) cluster.
-The resulting binary is meant to be used as the argument to CMD in a Dockerfile.
+The resulting binary is meant to be used as the argument to CMD in this [Dockerfile](https://github.com/hellofresh/logreplay-docker).
 
 This code handles following tasks:
   - writing template files based on values provided via environment variables,
