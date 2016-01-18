@@ -178,7 +178,7 @@ func spawnInteractiveLoginShell() error {
 	}
 
 	// Keep on keepin' on.
-	log.Printf("Successfully quit interactive login shell for user '%s' with state: %s\n", curUser.Username,
+	log.Printf("Successfully quit interactive login shell for user '%s' with: %s\n", curUser.Username,
 		state.String())
 
 	return nil
