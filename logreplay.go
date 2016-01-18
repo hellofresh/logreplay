@@ -154,11 +154,19 @@ func spawnInteractiveLoginShell() error {
 		Dir:   dstDir,
 	}
 
-	// Start up a new shell.
-	// Note that we supply "login" twice.
-	// -fpl means "don't prompt for PW and pass through environment."
+	/*
+		Start up a new shell.
+		Used login options:
+			-f
+		        Do not perform authentication, user is preauthenticated.
+		        Note: In that case, username is mandatory.
+		    -p
+		        Preserve environment.
+
+		Reference: http://manpages.ubuntu.com/manpages/trusty/man1/login.1.html
+	*/
 	log.Printf("About to start a new interactive shell.")
-	proc, err := os.StartProcess("/bin/login", []string{"login", "-fpl", curUser.Username}, &pa)
+	proc, err := os.StartProcess("/bin/login", []string{"login", "-fp", curUser.Username}, &pa)
 	if err != nil {
 		return fmt.Errorf("Error: Unable to start new interactive login shell: %s\n", err.Error())
 	}
@@ -170,7 +178,7 @@ func spawnInteractiveLoginShell() error {
 	}
 
 	// Keep on keepin' on.
-	log.Printf("Successfully quit interactive login shell for user '%s' with state: %s\n", curUser,
+	log.Printf("Successfully quit interactive login shell for user '%s' with state: %s\n", curUser.Username,
 		state.String())
 
 	return nil
