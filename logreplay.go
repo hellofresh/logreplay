@@ -5,7 +5,7 @@ package main
 import (
 	"bytes"
 	"fmt"
-	"github.com/docopt/docopt-go"
+	"github.com/hellofresh/logreplay/Godeps/_workspace/src/github.com/docopt/docopt-go"
 	"github.com/hellofresh/logreplay/Godeps/_workspace/src/github.com/juju/deputy"
 	"io/ioutil"
 	"log"
