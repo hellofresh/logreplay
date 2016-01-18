@@ -5,11 +5,13 @@ package main
 import (
 	"bytes"
 	"fmt"
+	"github.com/docopt/docopt-go"
 	"github.com/hellofresh/logreplay/Godeps/_workspace/src/github.com/juju/deputy"
 	"io/ioutil"
 	"log"
 	"os"
 	"os/exec"
+	"os/user"
 	"text/template"
 	"time"
 )
@@ -130,20 +132,67 @@ func startFilebeatAgent() error {
 	return nil
 }
 
-func main() {
-	// FileBeat configuration.
-	fBeatCfg := FbeatCfg{
-		ProspectorPath: getEnvVarOrFail(LOGS_PATH),
-		ESType:         getEnvVarOrFail(ES_TYPE),
-		ESHost:         getEnvVarOrFail(ES_HOST),
-		ESIndex:        getEnvVarOrFail(ES_INDEX),
+// In case --mount-only option is set, drop the user in an own shell process for looking at mounted S3 bucket data.
+// This code was shamelessly copied from Matt Butcher's cool blog post: Start an Interactive Shell from Within Go
+// (http://technosophos.com/2014/07/11/start-an-interactive-shell-from-within-go.html).
+
+func spawnInteractiveLoginShell() error {
+	dstDir := "/mnt/s3"
+	if err := os.Chdir("/mnt/s3"); err != nil {
+		return fmt.Errorf("Error: Cannot change working directory to '%s': %s\n", dstDir, err.Error())
 	}
 
-	fBeatTmplFile := "template/filebeat.yml.template"
-	fBeatDstFile := "/etc/filebeat/filebeat.yml"
+	// Get the current user.
+	curUser, err := user.Current()
+	if err != nil {
+		return fmt.Errorf("Error: Cannot determine current user: %s\n", err.Error())
+	}
 
-	if err := renderAndWriteTemplate(fBeatCfg, fBeatTmplFile, fBeatDstFile, 0644); err != nil {
-		log.Fatalln(err.Error())
+	// Transfer stdin, stdout, and stderr to the new process. Also set target directory for the shell to start in.
+	pa := os.ProcAttr{
+		Files: []*os.File{os.Stdin, os.Stdout, os.Stderr},
+		Dir:   dstDir,
+	}
+
+	// Start up a new shell.
+	// Note that we supply "login" twice.
+	// -fpl means "don't prompt for PW and pass through environment."
+	log.Printf("About to start a new interactive shell.")
+	proc, err := os.StartProcess("/usr/bin/login", []string{"login", "-fpl", curUser.Username}, &pa)
+	if err != nil {
+		return fmt.Errorf("Error: Unable to start new interactive login shell: %s\n", err.Error())
+	}
+
+	// Wait until user exits the shell
+	state, err := proc.Wait()
+	if err != nil {
+		return fmt.Errorf("Error: Something went wrong with the shell process: %s\n", err.Error())
+	}
+
+	// Keep on keepin' on.
+	log.Printf("Successfully quit interactive login shell for user '%s' with state: %s\n", curUser,
+		state.String())
+
+	return nil
+}
+
+func main() {
+	// Parsing command line arguments.
+	usage := `
+replay logs.
+
+Usage:
+  logreplay replay [--mount-only]
+  logreplay -h | --help
+
+Options:
+--mount-only   Do not start Filebeat service, only mount S3 bucket; start shell to look around [default: false].
+-h --help      Show this screen.`
+
+	// Do not require options first (reference: https://github.com/docopt/docopt.go/blob/master/docopt.go#L45).
+	args, err := docopt.Parse(usage, os.Args[1:], true, "", false)
+	if err != nil {
+		log.Fatalf("Error: Unable to parse command line arguments: %s", err.Error())
 	}
 
 	// AWS Credentials file for s3fs-fuse.
@@ -172,6 +221,30 @@ func main() {
 		log.Fatalf("Error: Unable to delete AWS creds file after mounting S3 bucket: %s\n", err.Error())
 	}
 	log.Printf("Successfully deleted credentials file.\n")
+
+	// Check if mounting the S3 bucket is all we have to do.
+	if args["--mount-only"].(bool) {
+		if err := spawnInteractiveLoginShell(); err != nil {
+			log.Printf(err.Error())
+		}
+		// Halt programm execution here for --mount-only option.
+		os.Exit(0)
+	}
+
+	// FileBeat configuration.
+	fBeatCfg := FbeatCfg{
+		ProspectorPath: getEnvVarOrFail(LOGS_PATH),
+		ESType:         getEnvVarOrFail(ES_TYPE),
+		ESHost:         getEnvVarOrFail(ES_HOST),
+		ESIndex:        getEnvVarOrFail(ES_INDEX),
+	}
+
+	fBeatTmplFile := "template/filebeat.yml.template"
+	fBeatDstFile := "/etc/filebeat/filebeat.yml"
+
+	if err := renderAndWriteTemplate(fBeatCfg, fBeatTmplFile, fBeatDstFile, 0644); err != nil {
+		log.Fatalln(err.Error())
+	}
 
 	// Load index template into ElasticSearch.
 	if err := loadFilebeatIndexTemplate(fBeatCfg.ESHost); err != nil {
