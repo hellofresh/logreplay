@@ -158,7 +158,7 @@ func spawnInteractiveLoginShell() error {
 	// Note that we supply "login" twice.
 	// -fpl means "don't prompt for PW and pass through environment."
 	log.Printf("About to start a new interactive shell.")
-	proc, err := os.StartProcess("/usr/bin/login", []string{"login", "-fpl", curUser.Username}, &pa)
+	proc, err := os.StartProcess("/bin/login", []string{"login", "-fpl", curUser.Username}, &pa)
 	if err != nil {
 		return fmt.Errorf("Error: Unable to start new interactive login shell: %s\n", err.Error())
 	}
