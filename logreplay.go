@@ -166,7 +166,7 @@ func spawnInteractiveLoginShell() error {
 		Reference: http://manpages.ubuntu.com/manpages/trusty/man1/login.1.html
 	*/
 	log.Printf("About to start a new interactive shell.")
-	proc, err := os.StartProcess("/bin/login", []string{"login", "-fp", curUser.Username}, &pa)
+	proc, err := os.StartProcess("/bin/login", []string{"login", "-p", "-f", curUser.Username}, &pa)
 	if err != nil {
 		return fmt.Errorf("Error: Unable to start new interactive login shell: %s\n", err.Error())
 	}
